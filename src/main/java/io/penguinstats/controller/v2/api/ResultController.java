@@ -66,9 +66,8 @@ public class ResultController {
 	public ResponseEntity<MatrixQueryResponse> getMatrix(HttpServletRequest request,
 			@RequestParam(name = "is_personal", required = false, defaultValue = "false") boolean isPersonal,
 			@RequestParam(name = "show_closed_zones", required = false, defaultValue = "false") boolean showClosedZones,
-			@RequestParam(name = "server", required = false, defaultValue = "CN") Server server) {
+			@RequestParam(name = "server", required = false, defaultValue = "CN") Server server) throws Exception {
 		logger.info("GET /matrix");
-		try {
 			String userID = isPersonal ? cookieUtil.readUserIDFromCookie(request) : null;
 
 			GlobalMatrixQuery query = (GlobalMatrixQuery)queryFactory.getQuery(QueryType.GLOBAL_MATRIX);
@@ -84,10 +83,6 @@ public class ResultController {
 					: generateLastModifiedHeadersFromLastUpdateMap(LastUpdateMapKeyName.MATRIX_RESULT + "_" + server);
 
 			return new ResponseEntity<MatrixQueryResponse>(result, headers, HttpStatus.OK);
-		} catch (Exception e) {
-			logger.error("Error in getMatrix", e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
 	}
 
 	@ApiOperation("Get segmented drop data for all items in all stages")
@@ -95,8 +90,7 @@ public class ResultController {
 	public ResponseEntity<TrendQueryResponse> getAllSegmentedDropResults(
 			@RequestParam(name = "interval_day", required = false, defaultValue = "1") int interval,
 			@RequestParam(name = "range_day", required = false, defaultValue = "30") int range,
-			@RequestParam(name = "server", required = false, defaultValue = "CN") Server server) {
-		try {
+			@RequestParam(name = "server", required = false, defaultValue = "CN") Server server) throws Exception {
 			GlobalTrendQuery query = (GlobalTrendQuery)queryFactory.getQuery(QueryType.GLOBAL_TREND);
 			query.setServer(server).setInterval(interval).setRange(range).setTimeout(3);
 			List<DropMatrixElement> elements = query.execute();
@@ -107,22 +101,17 @@ public class ResultController {
 					LastUpdateMapKeyName.TREND_RESULT + "_" + server + "_" + interval + "_" + range);
 
 			return new ResponseEntity<TrendQueryResponse>(result, headers, HttpStatus.OK);
-		} catch (Exception e) {
-			logger.error("Error in getAllSegmentedDropResults: ", e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
 	}
 
 	@ApiOperation("Execute advanced queries")
 	@PostMapping(path = "/advanced", produces = "application/json;charset=UTF-8")
 	public ResponseEntity<AdvancedQueryResponse> executeAdvancedQueries(
-			@Valid @RequestBody AdvancedQueryRequest advancedQueryRequest, HttpServletRequest request) {
+			@Valid @RequestBody AdvancedQueryRequest advancedQueryRequest, HttpServletRequest request) throws Exception {
 		if (advancedQueryRequest.getQueries().size() > Constant.MAX_QUERY_NUM) {
 			AdvancedQueryResponse advancedQueryResponse =
 					new AdvancedQueryResponse("Too many quiries. Max num is " + Constant.MAX_QUERY_NUM);
 			return new ResponseEntity<>(advancedQueryResponse, HttpStatus.BAD_REQUEST);
 		}
-		try {
 			final String userIDFromCookie = cookieUtil.readUserIDFromCookie(request);
 			List<BasicQueryResponse> results = new ArrayList<>();
 			advancedQueryRequest.getQueries().forEach(singleQuery -> {
@@ -143,10 +132,6 @@ public class ResultController {
 			});
 			AdvancedQueryResponse advancedQueryResponse = new AdvancedQueryResponse(results);
 			return new ResponseEntity<AdvancedQueryResponse>(advancedQueryResponse, HttpStatus.OK);
-		} catch (Exception e) {
-			logger.error("Error in executeAdvancedQueries: ", e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
 	}
 
 	private void removeClosedStages(List<DropMatrixElement> elements, Server server) {
