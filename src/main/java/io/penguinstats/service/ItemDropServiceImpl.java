@@ -3,6 +3,21 @@ package io.penguinstats.service;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 
+import io.penguinstats.constant.Constant;
+import io.penguinstats.constant.Constant.LastUpdateMapKeyName;
+import io.penguinstats.dao.ItemDropDao;
+import io.penguinstats.enums.ErrorCode;
+import io.penguinstats.enums.Server;
+import io.penguinstats.model.DropMatrixElement;
+import io.penguinstats.model.Item;
+import io.penguinstats.model.ItemDrop;
+import io.penguinstats.model.QueryConditions;
+import io.penguinstats.model.Stage;
+import io.penguinstats.model.TimeRange;
+import io.penguinstats.util.HashUtil;
+import io.penguinstats.util.LastUpdateTimeUtil;
+import io.penguinstats.util.exception.DatabaseException;
+import io.penguinstats.util.exception.NotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -15,7 +30,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.Document;
@@ -27,19 +41,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
-
-import io.penguinstats.constant.Constant;
-import io.penguinstats.constant.Constant.LastUpdateMapKeyName;
-import io.penguinstats.dao.ItemDropDao;
-import io.penguinstats.enums.Server;
-import io.penguinstats.model.DropMatrixElement;
-import io.penguinstats.model.Item;
-import io.penguinstats.model.ItemDrop;
-import io.penguinstats.model.QueryConditions;
-import io.penguinstats.model.Stage;
-import io.penguinstats.model.TimeRange;
-import io.penguinstats.util.HashUtil;
-import io.penguinstats.util.LastUpdateTimeUtil;
 
 @Service("itemDropService")
 public class ItemDropServiceImpl implements ItemDropService {
@@ -75,7 +76,7 @@ public class ItemDropServiceImpl implements ItemDropService {
 	public void deleteItemDrop(String userID, String itemDropId) throws Exception {
 		ItemDrop itemDrop = itemDropDao.findById(itemDropId).orElse(null);
 		if (itemDrop == null || !itemDrop.getUserID().equals(userID)) {
-			throw new Exception("ItemDrop[" + itemDropId + "] not found for user with ID[" + userID + "]");
+			throw new NotFoundException(ErrorCode.NOT_FOUND, "ItemDrop[" + itemDropId + "] not found for user with ID[" + userID + "]", null);
 		}
 
 		itemDrop.setIsDeleted(true);
@@ -87,13 +88,14 @@ public class ItemDropServiceImpl implements ItemDropService {
 		Pageable pageable = PageRequest.of(0, 1, new Sort(Sort.Direction.DESC, "timestamp"));
 		List<ItemDrop> itemDropList = getVisibleItemDropsByUserID(userID, pageable).getContent();
 		if (itemDropList.size() == 0) {
-			throw new Exception("Visible ItemDrop not found for user with ID[" + userID + "]");
+			throw new NotFoundException(ErrorCode.NOT_FOUND, "Visible ItemDrop not found for user with ID[" + userID + "]", null);
 		}
 
 		ItemDrop lastItemDrop = itemDropList.get(0);
 		String lastItemDropHashId = HashUtil.getHash(lastItemDrop.getId().toString());
 		if (!lastItemDropHashId.equals(itemDropHashId)) {
-			throw new Exception("ItemDropHashId doesn't match!");
+			throw new DatabaseException(ErrorCode.ITEM_DROP_HASH_ID_NOT_MATCH, "ItemDropHashId doesn't match!",
+					Optional.ofNullable(itemDropHashId));
 		}
 
 		lastItemDrop.setIsDeleted(true);
